@@ -2,12 +2,10 @@
 import time
 import json
 import logging
-import base64
 import requests
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
 
 try:
     from colorama import init, Fore, Style
@@ -54,68 +52,6 @@ class AgentNotification:
             pass
 
 # ==========================================
-# 🧠 AGENT D'ANALYSE (CONNEXION FORCÉE)
-# ==========================================
-class AgentAnalyse:
-    @staticmethod
-    def verifier_connexion_ia():
-        if not GEMINI_API_KEY:
-            return False
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={GEMINI_API_KEY}"
-        headers = {"Content-Type": "application/json"}
-        payload = {"contents": [{"parts": [{"text": "Dis OK"}]}]}
-
-        for essai in range(1, 4):
-            try:
-                response = requests.post(url, json=payload, headers=headers, timeout=30.0)
-                if response.status_code == 200:
-                    return True
-            except Exception:
-                pass
-        return False
-
-# ==========================================
-# 👁️ AGENT UNIVERSEL NAVIGATION & SURVEILLANCE
-# ==========================================
-class AgentNavigationVisionTotale:
-    @staticmethod
-    def preparer_site_avec_reflexes_humains(driver, site_url):
-        max_cycles = 2
-        for cycle in range(1, max_cycles + 1):
-            try:
-                driver.get(site_url)
-                time.sleep(4)
-
-                # Nettoyage automatique des bannières et cookies
-                driver.execute_script("""
-                    const cookiesKw = ['accept', 'accepter', 'agree', 'autoriser', 'consent', 'alle annehmen', 'got it', 'ok', 'tout accepter', 'allow all', 'cookies', 'fermer', 'close'];
-                    document.querySelectorAll('button, a, div, span').forEach(el => {
-                        const txt = (el.innerText || '').toLowerCase();
-                        if (cookiesKw.some(kw => txt.includes(kw)) && txt.length < 60) {
-                            try { el.click(); } catch(e){}
-                        }
-                    });
-                    document.querySelectorAll('.modal, .popup, .cookie-banner, .overlay, [aria-label*="close"], [class*="close"]').forEach(el => {
-                        try { el.style.display = 'none'; el.remove(); } catch(e){}
-                    });
-                """)
-                time.sleep(2)
-
-                body_text = driver.execute_script("return document.body.innerText;")
-                if len(body_text.strip()) > 80:
-                    return True
-                else:
-                    driver.refresh()
-                    time.sleep(5)
-            except Exception:
-                try:
-                    driver.refresh()
-                except Exception:
-                    pass
-                time.sleep(3)
-        return False
-
-# ==========================================
 # 📡 LISTE DES 11 PLATEFORMES DE VISA
 # ==========================================
 SITES = [
@@ -135,10 +71,12 @@ SITES = [
 def mode_surveillance_automatique_12():
     print(f"\n{CYAN}🚀 Démarrage de la surveillance globale des 11 pays...{RESET}\n")
     
-    options = webdriver.ChromeOptions()
+    options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
@@ -148,7 +86,8 @@ def mode_surveillance_automatique_12():
         for site in SITES:
             driver = None
             try:
-                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+                # Initialisation propre sans ChromeDriver Manager pour GitHub Actions
+                driver = webdriver.Chrome(options=options)
                 driver.get(site["url"])
                 time.sleep(3)
                 
@@ -180,8 +119,8 @@ def mode_surveillance_automatique_12():
             time.sleep(1)
             
         print(f"\n{CYAN}💤 Pause de {INTERVALLE_VERIF}s avant le prochain cycle...{RESET}")
+        print("-" * 50)
         time.sleep(INTERVALLE_VERIF)
 
 if __name__ == "__main__":
-    # Lancement direct du mode cloud/automatisation sans bloquer sur un menu interactif
     mode_surveillance_automatique_12()
