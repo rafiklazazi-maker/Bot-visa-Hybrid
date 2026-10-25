@@ -22,7 +22,6 @@ except ImportError:
 # --- CONFIGURATION API & TELEGRAM ---
 TELEGRAM_TOKEN = "8356719393:AAHaNKKYG_W5ExbNYIM3M3Qp1N2uebqoLEE"
 TELEGRAM_CHAT_ID = "7985193485"
-INTERVALLE_VERIF = 60  # Temps d'attente entre chaque vérification globale
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -49,8 +48,8 @@ SITES = [
     {"id": "11", "nom": "Portugal (Ambassade)", "url": "https://argel.embaixadaportugal.mne.gov.pt/fr/section-consulaire/visa-fr"}
 ]
 
-def mode_surveillance_automatique_12():
-    print(f"\n{CYAN}🚀 Démarrage de la surveillance globale des 11 pays...{RESET}\n")
+def verifier_tous_les_sites():
+    print(f"\n{CYAN}🚀 Démarrage d'un cycle de surveillance globale des 11 pays...{RESET}\n")
     
     options = Options()
     options.add_argument("--headless=new")
@@ -62,58 +61,44 @@ def mode_surveillance_automatique_12():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
 
-    # Mémoire de l'état précédent pour chaque site
-    dernier_etat_ouvert = {site["nom"]: False for site in SITES}
-
-    while True:
-        print(f"\n{BLUE}--- Cycle de vérification global à {time.strftime('%H:%M:%S')} ---{RESET}")
-        for site in SITES:
-            driver = None
-            nom_site = site['nom']
-            try:
-                driver = webdriver.Chrome(options=options)
-                driver.get(site["url"])
-                time.sleep(3)
-                
-                page_text = driver.execute_script("return document.body.innerText;")
-                page_lower = page_text.lower()
-                mots_bloquants = ["complet", "fully booked", "no slots", "aucun rendez-vous", "fermé", "indisponible", "no appointments available"]
-                est_ferme = any(mot in page_lower for mot in mots_bloquants)
-                site_ok = len(page_text.strip()) > 100
-                calendrier_ouvert = not est_ferme if site_ok else False
-                
-                statut_site_str = f"{GREEN}OK{RESET}" if site_ok else f"{RED}EN PANNE{RESET}"
-                statut_cal_str = f"{GREEN}OUVERT / DISPONIBLE{RESET}" if calendrier_ouvert else f"{YELLOW}FERMÉ / COMPLET{RESET}"
-                
-                print(f"🌍 {nom_site} ➔ Site : [{statut_site_str}] | Calendrier : [{statut_cal_str}]")
-                
-                # CHANGEMENT POSITIF : Site OK et Calendrier DISPONIBLE
-                if site_ok and calendrier_ouvert:
-                    if not dernier_etat_ouvert[nom_site]:
-                        msg = f"🟢 *CHANGEMENT POSITIF* \n🌍 Pays : *{nom_site}*\n✅ *Site OK & Calendrier DISPONIBLE !*\n🔗 [Accéder au site]({site['url']})"
-                        AgentNotification.envoyer_alerte(msg)
-                        dernier_etat_ouvert[nom_site] = True
-                
-                # CHANGEMENT NÉGATIF : Calendrier fermé ou non disponible / site en panne
-                else:
-                    if dernier_etat_ouvert[nom_site]:
-                        msg = f"🔴 *CHANGEMENT NÉGATIF* \n🌍 Pays : *{nom_site}*\n❌ *Calendrier fermé / non disponible ou site en panne.*"
-                        AgentNotification.envoyer_alerte(msg)
-                        dernier_etat_ouvert[nom_site] = False
-                    
-            except Exception as e:
-                print(f"{RED}❌ Erreur sur {nom_site} : {e}{RESET}")
-            finally:
-                if driver:
-                    try:
-                        driver.quit()
-                    except Exception:
-                        pass
-            time.sleep(1)
+    for site in SITES:
+        driver = None
+        nom_site = site['nom']
+        try:
+            driver = webdriver.Chrome(options=options)
+            driver.get(site["url"])
+            time.sleep(3)
             
-        print(f"\n{CYAN}💤 Pause de {INTERVALLE_VERIF}s avant le prochain cycle...{RESET}")
-        print("-" * 50)
-        time.sleep(INTERVALLE_VERIF)
+            page_text = driver.execute_script("return document.body.innerText;")
+            page_lower = page_text.lower()
+            mots_bloquants = ["complet", "fully booked", "no slots", "aucun rendez-vous", "fermé", "indisponible", "no appointments available"]
+            est_ferme = any(mot in page_lower for mot in mots_bloquants)
+            site_ok = len(page_text.strip()) > 100
+            calendrier_ouvert = not est_ferme if site_ok else False
+            
+            statut_site_str = f"{GREEN}OK{RESET}" if site_ok else f"{RED}EN PANNE{RESET}"
+            statut_cal_str = f"{GREEN}OUVERT / DISPONIBLE{RESET}" if calendrier_ouvert else f"{YELLOW}FERMÉ / COMPLET{RESET}"
+            
+            print(f"🌍 {nom_site} ➔ Site : [{statut_site_str}] | Calendrier : [{statut_cal_str}]")
+            
+            if site_ok and calendrier_ouvert:
+                msg = f"🟢 *CHANGEMENT POSITIF* \n🌍 Pays : *{nom_site}*\n✅ *Site OK & Calendrier DISPONIBLE !*\n🔗 [Accéder au site]({site['url']})"
+                AgentNotification.envoyer_alerte(msg)
+            else:
+                # Optionnel : si tu veux être alerté à chaque vérification de fermeture, ou tu peux commenter cette partie si tu ne veux que les ouvertures
+                pass
+                
+        except Exception as e:
+            print(f"{RED}❌ Erreur sur {nom_site} : {e}{RESET}")
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+        time.sleep(1)
+        
+    print(fin := f"\n{CYAN}✨ Fin du cycle de vérification.{RESET}")
 
 if __name__ == "__main__":
-    mode_surveillance_automatique_12()
+    verifier_tous_les_sites()
