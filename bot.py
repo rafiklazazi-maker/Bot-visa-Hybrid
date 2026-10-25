@@ -14,24 +14,18 @@ try:
     RED = Fore.RED + Style.BRIGHT
     YELLOW = Fore.YELLOW + Style.BRIGHT
     CYAN = Fore.CYAN + Style.BRIGHT
-    MAGENTA = Fore.MAGENTA + Style.BRIGHT
     BLUE = Fore.BLUE + Style.BRIGHT
-    WHITE = Fore.WHITE + Style.BRIGHT
     RESET = Style.RESET_ALL
 except ImportError:
-    GREEN = RED = YELLOW = CYAN = MAGENTA = BLUE = WHITE = RESET = ""
+    GREEN = RED = YELLOW = CYAN = BLUE = RESET = ""
 
 # --- CONFIGURATION API & TELEGRAM ---
 TELEGRAM_TOKEN = "8356719393:AAHaNKKYG_W5ExbNYIM3M3Qp1N2uebqoLEE"
 TELEGRAM_CHAT_ID = "7985193485"
-GEMINI_API_KEY = "AQ.Ab8RN6KOjCEFQZaF_-8VrbZtAbE4B7DZ_F5VbRZZndPpYUiAAQ"
-INTERVALLE_VERIF = 60
+INTERVALLE_VERIF = 60  # Temps d'attente entre chaque vérification globale
 
 logging.basicConfig(level=logging.ERROR)
 
-# ==========================================
-# 📡 AGENT DE NOTIFICATION (TELEGRAM & ALARME)
-# ==========================================
 class AgentNotification:
     @staticmethod
     def envoyer_alerte(message):
@@ -41,19 +35,6 @@ class AgentNotification:
         except Exception:
             pass
 
-    @staticmethod
-    def faire_sonner():
-        try:
-            import winsound
-            for _ in range(3):
-                winsound.Beep(2500, 1000)
-                time.sleep(0.2)
-        except Exception:
-            pass
-
-# ==========================================
-# 📡 LISTE DES 11 PLATEFORMES DE VISA
-# ==========================================
 SITES = [
     {"id": "1", "nom": "Espagne (BLS)", "url": "https://algeria.blsspainvisa.com/"},
     {"id": "2", "nom": "France (Capago)", "url": "https://fr-dz.capago.eu/fr/rendezvous/"},
@@ -81,12 +62,15 @@ def mode_surveillance_automatique_12():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
 
+    # Mémoire de l'état précédent pour chaque site (False = fermé/inconnu, True = ouvert)
+    dernier_etat_ouvert = {site["nom"]: False for site in SITES}
+
     while True:
         print(f"\n{BLUE}--- Cycle de vérification global à {time.strftime('%H:%M:%S')} ---{RESET}")
         for site in SITES:
             driver = None
+            nom_site = site['nom']
             try:
-                # Initialisation propre sans ChromeDriver Manager pour GitHub Actions
                 driver = webdriver.Chrome(options=options)
                 driver.get(site["url"])
                 time.sleep(3)
@@ -101,15 +85,24 @@ def mode_surveillance_automatique_12():
                 statut_site_str = f"{GREEN}OK{RESET}" if site_ok else f"{RED}EN PANNE{RESET}"
                 statut_cal_str = f"{GREEN}OUVERT / DISPONIBLE{RESET}" if calendrier_ouvert else f"{YELLOW}FERMÉ / COMPLET{RESET}"
                 
-                print(f"🌍 {site['nom']} ➔ Site : [{statut_site_str}] | Calendrier : [{statut_cal_str}]")
+                print(f"🌍 {nom_site} ➔ Site : [{statut_site_str}] | Calendrier : [{statut_cal_str}]")
                 
+                # CAS 1 : Le calendrier s'ouvre (et il était fermé avant)
                 if site_ok and calendrier_ouvert:
-                    msg = f"🚨 *ALERTE VISA DISPONIBLE !* \n🌍 Pays : *{site['nom']}*\n🔗 [Accéder au site]({site['url']})"
-                    AgentNotification.envoyer_alerte(msg)
-                    AgentNotification.faire_sonner()
+                    if not dernier_etat_ouvert[nom_site]:
+                        msg = f"🚨 *ALERTE : CRÉNEAUX DISPONIBLES !* \n🌍 Pays : *{nom_site}*\n🔗 [Accéder au site]({site['url']})"
+                        AgentNotification.envoyer_alerte(msg)
+                        dernier_etat_ouvert[nom_site] = True  # Mémorise qu'il est ouvert
+                
+                # CAS 2 : Le calendrier se ferme (et il était ouvert avant)
+                else:
+                    if dernier_etat_ouvert[nom_site]:
+                        msg = f"🔒 *INFORMATION : Calendrier fermé / complet.* \n🌍 Pays : *{nom_site}*"
+                        AgentNotification.envoyer_alerte(msg)
+                        dernier_etat_ouvert[nom_site] = False  # Mémorise qu'il est fermé
                     
             except Exception as e:
-                print(f"{RED}❌ Erreur sur {site['nom']} : {e}{RESET}")
+                print(f"{RED}❌ Erreur sur {nom_site} : {e}{RESET}")
             finally:
                 if driver:
                     try:
