@@ -62,7 +62,7 @@ def mode_surveillance_automatique_12():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
 
-    # Mémoire de l'état précédent pour chaque site (False = fermé/inconnu, True = ouvert)
+    # Mémoire de l'état précédent pour chaque site
     dernier_etat_ouvert = {site["nom"]: False for site in SITES}
 
     while True:
@@ -87,19 +87,19 @@ def mode_surveillance_automatique_12():
                 
                 print(f"🌍 {nom_site} ➔ Site : [{statut_site_str}] | Calendrier : [{statut_cal_str}]")
                 
-                # CAS 1 : Le calendrier s'ouvre (et il était fermé avant)
+                # CHANGEMENT POSITIF : Site OK et Calendrier DISPONIBLE
                 if site_ok and calendrier_ouvert:
                     if not dernier_etat_ouvert[nom_site]:
-                        msg = f"🚨 *ALERTE : CRÉNEAUX DISPONIBLES !* \n🌍 Pays : *{nom_site}*\n🔗 [Accéder au site]({site['url']})"
+                        msg = f"🟢 *CHANGEMENT POSITIF* \n🌍 Pays : *{nom_site}*\n✅ *Site OK & Calendrier DISPONIBLE !*\n🔗 [Accéder au site]({site['url']})"
                         AgentNotification.envoyer_alerte(msg)
-                        dernier_etat_ouvert[nom_site] = True  # Mémorise qu'il est ouvert
+                        dernier_etat_ouvert[nom_site] = True
                 
-                # CAS 2 : Le calendrier se ferme (et il était ouvert avant)
+                # CHANGEMENT NÉGATIF : Calendrier fermé ou non disponible / site en panne
                 else:
                     if dernier_etat_ouvert[nom_site]:
-                        msg = f"🔒 *INFORMATION : Calendrier fermé / complet.* \n🌍 Pays : *{nom_site}*"
+                        msg = f"🔴 *CHANGEMENT NÉGATIF* \n🌍 Pays : *{nom_site}*\n❌ *Calendrier fermé / non disponible ou site en panne.*"
                         AgentNotification.envoyer_alerte(msg)
-                        dernier_etat_ouvert[nom_site] = False  # Mémorise qu'il est fermé
+                        dernier_etat_ouvert[nom_site] = False
                     
             except Exception as e:
                 print(f"{RED}❌ Erreur sur {nom_site} : {e}{RESET}")
